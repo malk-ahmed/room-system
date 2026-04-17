@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>AASTMT Booking System</title>
+    <style>
+        :root { --primary: #003366; --accent: #c5a059; --white: #ffffff; --danger: #dc3545; --success: #28a745; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f4f7f6; }
+        
+        #welcomeScreen { height: 100vh; background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; position: fixed; width: 100%; z-index: 1000; transition: 0.8s; }
+        .aast-full-name { font-size: 1.8rem; font-weight: bold; margin: 20px; line-height: 1.4; }
+
+        #authContainer { height: 100vh; display: none; justify-content: center; align-items: center; background: #f0f2f5; }
+        .auth-card { background: var(--white); padding: 30px; border-radius: 15px; width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .pass-error { color: var(--danger); font-size: 0.8rem; display: none; margin-bottom: 10px; }
+
+        #dashboard { display: none; height: 100vh; }
+        .sidebar { width: 280px; background: var(--primary); color: white; padding: 25px; position: relative; }
+        .main-content { flex: 1; padding: 30px; overflow-y: auto; }
+        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        
+        .btn { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; color: white; }
+        .btn-primary { background: var(--primary); width: 100%; }
+        .btn-accent { background: var(--accent); width: 100%; }
+        .btn-back { background: #6c757d; width: auto; padding: 5px 15px; margin-bottom: 15px; cursor: pointer; border:none; border-radius:5px; color:white; }
+        
+        .building-title { background: var(--accent); color: white; padding: 8px; border-radius: 5px; margin: 15px 0; }
+        .monitor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+        .room-box { padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #eee; font-size: 0.8rem; }
+        .booked { background: #fee2e2; color: #991b1b; border-color: #f87171; }
+        .free { background: #dcfce7; color: #166534; border-color: #86efac; }
+        
+        .msg-red { color: var(--danger); font-weight: bold; margin: 10px 0; display: none; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="welcomeScreen">
+        <div class="aast-full-name">ARAB ACADEMY FOR SCIENCE, TECHNOLOGY AND MARITIME TRANSPORT</div>
+        <p style="color: var(--accent);">Smart Room Management System</p>
+        <button class="btn btn-accent" style="width: 200px; margin-top: 30px;" onclick="startApp()">START SYSTEM</button>
+    </div>
+
+    <div id="authContainer">
+        <div id="loginBox" class="auth-card">
+            <h2 style="color: var(--primary)">تسجيل الدخول</h2>
+            <input type="text" id="logId" placeholder="كود الموظف">
+            <input type="password" id="logPass" placeholder="كلمة المرور">
+            <button class="btn btn-primary" onclick="login()">دخول</button>
+            <p onclick="toggleAuth(true)" style="cursor:pointer; color: var(--accent); margin-top:15px;">إنشاء حساب جديد</p>
+        </div>
+
+        <div id="signupBox" class="auth-card hidden">
+            <button class="btn-back" onclick="toggleAuth(false)">رجوع</button>
+            <h2 style="color: var(--primary)">إنشاء حساب</h2>
+            <input type="text" id="regName" placeholder="الاسم بالكامل">
+            <input type="text" id="regId" placeholder="كود الموظف">
+            <select id="regRole">
+                <option value="Employee">موظف (Employee)</option>
+                <option value="Admin">آدمن (Admin)</option>
+                <option value="Manager">مانجر (Manager)</option>
+                <option value="Secretary">سكرتير (Secretary)</option>
+            </select>
+            <input type="password" id="regPass" placeholder="كلمة المرور" oninput="validatePassword(this)">
+            <div id="passErrorHint" class="pass-error">The password must contain letters, numbers and symbols</div>
+            <button id="btnSignup" class="btn btn-accent" onclick="signup()" disabled>إنشاء الحساب ودخول</button>
+        </div>
+    </div>
+
+    <div id="dashboard">
+        <div class="sidebar">
+            <h3>AASTMT</h3>
+            <p id="userStatus" style="color: var(--accent);"></p>
+            <hr style="border: 0.1px solid #ffffff33;">
+            <nav id="navLinks">
+                <p onclick="showTab('booking')" style="cursor:pointer">📅 تقديم طلب</p>
+            </nav>
+            <button class="btn" style="background: var(--danger); position: absolute; bottom: 20px; width: 230px;" onclick="location.reload()">تسجيل خروج</button>
+        </div>
+
+        <div class="main-content">
+            <div id="tabBooking" class="card">
+                <h3>حجز القاعات</h3>
+                <div id="timeRangeError" class="msg-red">The day starts at 8:30 AM and ends at 8:10 PM</div>
+                <div id="deadlineError" class="msg-red">للقاعات العادية، الموعد النهائي هو 11:59 مساء اليوم السابق.</div>
+                
+                <select id="bType">
+                    <option value="lecture">قاعة عادية</option>
+                    <option value="multi">قاعة متعددة الأغراض</option>
+                </select>
+                <input type="text" id="bRoom" placeholder="رقم القاعة">
+                <label>اليوم:</label>
+                <input type="date" id="bDay">
+                <label>من الساعة:</label>
+                <input type="time" id="bStart">
+                <label>إلى الساعة:</label>
+                <input type="time" id="bEnd">
+                <button class="btn btn-primary" onclick="submitRequest()">إرسال الطلب</button>
+                <hr>
+                <h4>إشعاراتي</h4>
+                <div id="userNotifs"></div>
+            </div>
+
+            <div id="tabMonitor" class="card hidden">
+                <button class="btn-back" onclick="showTab('booking')">رجوع</button>
+                <h3>مراقبة القاعات</h3>
+                <div class="building-title">المبنى الجديد (A)</div>
+                <div id="gridNew" class="monitor-grid"></div>
+                <div class="building-title">المبنى القديم (Halls)</div>
+                <div id="gridOld" class="monitor-grid"></div>
+                <div class="building-title">قاعات متعددة الأغراض (001, 401)</div>
+                <div id="gridMulti" class="monitor-grid"></div>
+            </div>
+
+            <div id="tabRequests" class="card hidden">
+                <button class="btn-back" onclick="showTab('booking')">رجوع</button>
+                <h3>إدارة الطلبات والموافقات</h3>
+                <div id="requestList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // تحميل البيانات من الـ LocalStorage أو استخدام قيم افتراضية
+        let users = JSON.parse(localStorage.getItem('aast_users')) || [
+            { id: "admin", pass: "A1!", name: "مدير النظام", role: "Admin" },
+            { id: "manager", pass: "M1!", name: "مدير الفرع", role: "Manager" }
+        ];
+        let finalizedBookings = JSON.parse(localStorage.getItem('aast_finalized')) || []; 
+        let allRequests = JSON.parse(localStorage.getItem('aast_requests')) || [];
+        let currentUser = null;
+
+        function saveData() {
+            localStorage.setItem('aast_users', JSON.stringify(users));
+            localStorage.setItem('aast_finalized', JSON.stringify(finalizedBookings));
+            localStorage.setItem('aast_requests', JSON.stringify(allRequests));
+        }
+
+        function startApp() {
+            document.getElementById('welcomeScreen').style.top = "-100vh";
+            setTimeout(() => { document.getElementById('authContainer').style.display = "flex"; }, 500);
+        }
+
+        function validatePassword(input) {
+            const regex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+={}\[\]:;"'<>,.?/-]).{3,}$/;
+            const errorHint = document.getElementById('passErrorHint');
+            const btn = document.getElementById('btnSignup');
+            if(regex.test(input.value)) { errorHint.style.display = "none"; btn.disabled = false; }
+            else { errorHint.style.display = "block"; btn.disabled = true; }
+        }
+
+        function toggleAuth(isSignup) {
+            document.getElementById('loginBox').classList.toggle('hidden', isSignup);
+            document.getElementById('signupBox').classList.toggle('hidden', !isSignup);
+        }
+
+        function signup() {
+            const id = document.getElementById('regId').value;
+            if(users.find(u => u.id === id)) return alert("الكود مسجل بالفعل!");
+            const user = {
+                id: id,
+                name: document.getElementById('regName').value,
+                pass: document.getElementById('regPass').value,
+                role: document.getElementById('regRole').value
+            };
+            users.push(user);
+            saveData(); // حفظ الحساب الجديد في السيستم
+            currentUser = user;
+            enterDashboard();
+        }
+
+        function login() {
+            const u = users.find(x => x.id === document.getElementById('logId').value && x.pass === document.getElementById('logPass').value);
+            if(!u) return alert("بيانات خاطئة!");
+            currentUser = u;
+            enterDashboard();
+        }
+
+        function enterDashboard() {
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'flex';
+            document.getElementById('userStatus').innerText = `${currentUser.name} (${currentUser.role})`;
+            
+            const nav = document.getElementById('navLinks');
+            nav.innerHTML = `<p onclick="showTab('booking')" style="cursor:pointer">📅 تقديم طلب</p>`;
+            if(currentUser.role === 'Admin' || currentUser.role === 'Manager' || currentUser.role === 'Secretary') {
+                nav.innerHTML += `<p onclick="showTab('monitor')" style="cursor:pointer">🖥️ مراقبة القاعات</p>`;
+                nav.innerHTML += `<p onclick="showTab('requests')" style="cursor:pointer">⚖️ إدارة الطلبات</p>`;
+            }
+            renderUI();
+        }
+
+        function submitRequest() {
+            const room = document.getElementById('bRoom').value.toUpperCase();
+            const day = document.getElementById('bDay').value;
+            const start = document.getElementById('bStart').value;
+            const end = document.getElementById('bEnd').value;
+            const type = document.getElementById('bType').value;
+
+            if(start < "08:30" || end > "20:10") {
+                document.getElementById('timeRangeError').style.display = "block"; return;
+            }
+            document.getElementById('timeRangeError').style.display = "none";
+
+            // فحص الـ 48 ساعة للسكرتير أو القاعات المتعددة
+            if(type === 'multi' || currentUser.role === 'Secretary') {
+                const diff = (new Date(day + 'T' + start) - new Date()) / (1000 * 60 * 60);
+                if(diff < 48) return alert("القاعات متعددة الأغراض تتطلب حجز قبل 48 ساعة!");
+            }
+
+            // فحص الـ 11:59 مساء اليوم السابق للقاعات العادية
+            if(type === 'lecture') {
+                const today = new Date().toISOString().split('T')[0];
+                if(day <= today) { document.getElementById('deadlineError').style.display = "block"; return; }
+            }
+            document.getElementById('deadlineError').style.display = "none";
+
+            // فحص التضارب القاطع
+            if(finalizedBookings.find(b => b.room === room && b.day === day && ((start >= b.start && start < b.end) || (end > b.start && end <= b.end)))) {
+                return alert("⚠️ ايرور: القاعة محجوزة في هذا التوقيت!");
+            }
+
+            allRequests.push({
+                id: Date.now(), requester: currentUser.name, room, day, start, end, type,
+                status: (type === 'multi') ? 'بانتظار السكرتير' : 'بانتظار الآدمن'
+            });
+            saveData();
+            alert("تم إرسال الطلب.");
+            renderUI();
+        }
+
+        function handleAction(id, action) {
+            const req = allRequests.find(r => r.id === id);
+            if(action === 'approve') {
+                if(currentUser.role === 'Secretary') req.status = 'بانتظار الآدمن';
+                else if(currentUser.role === 'Admin') req.status = 'بانتظار المانجر';
+                else if(currentUser.role === 'Manager') {
+                    req.status = 'مقبول نهائياً';
+                    finalizedBookings.push({...req});
+                }
+            } else if(action === 'reject') {
+                const reason = prompt("سبب الرفض أو اقتراح بديل:");
+                req.status = `مرفوض: ${reason}`;
+            } else if(action === 'delete') {
+                finalizedBookings = finalizedBookings.filter(b => b.id !== id);
+                allRequests = allRequests.filter(r => r.id !== id);
+            }
+            saveData();
+            renderUI();
+        }
+
+        function renderUI() {
+            const gridNew = document.getElementById('gridNew');
+            const gridOld = document.getElementById('gridOld');
+            const gridMulti = document.getElementById('gridMulti');
+            gridNew.innerHTML = gridOld.innerHTML = gridMulti.innerHTML = "";
+
+            // رسم القاعات
+            for(let f=1; f<=4; f++) for(let r=102; r<=109; r++) createRoomBox(`A-${f}${r.toString().slice(1)}`, gridNew);
+            "ABCDEFGHIJK".split("").forEach(c => createRoomBox(c, gridOld));
+            ["001", "401"].forEach(m => createRoomBox(m, gridMulti));
+
+            // قائمة الطلبات للإدارة
+            const reqList = document.getElementById('requestList');
+            reqList.innerHTML = "";
+            let filtered = allRequests.filter(r => {
+                if(currentUser.role === 'Secretary') return r.type === 'multi' && r.status === 'بانتظار السكرتير';
+                if(currentUser.role === 'Admin') return r.status === 'بانتظار الآدمن';
+                if(currentUser.role === 'Manager') return r.status === 'بانتظار المانجر';
+                return false;
+            });
+
+            filtered.forEach(r => {
+                reqList.innerHTML += `
+                    <div class="card" style="border-right: 5px solid var(--accent)">
+                        <b>الموظف: ${r.requester}</b> | قاعة: ${r.room}<br>
+                        التوقيت: ${r.day} من ${r.start} إلى ${r.end}<br>
+                        <button class="btn btn-back" style="background:var(--success)" onclick="handleAction(${r.id}, 'approve')">قبول</button>
+                        <button class="btn btn-back" style="background:var(--danger)" onclick="handleAction(${r.id}, 'reject')">رفض</button>
+                    </div>`;
+            });
+
+            document.getElementById('userNotifs').innerHTML = allRequests.filter(r => r.requester === currentUser.name).map(r => `
+                <div style="padding:10px; border-bottom:1px solid #eee;">حجز ${r.room} في ${r.day}: <b>${r.status}</b></div>`).join('');
+        }
+
+        function createRoomBox(code, container) {
+            const booking = finalizedBookings.find(b => b.room === code);
+            const box = document.createElement('div');
+            box.className = `room-box ${booking ? 'booked' : 'free'}`;
+            box.innerHTML = `<b>${code}</b><br>${booking ? `مشغول لـ ${booking.end}` : 'فاضية'}`;
+            container.appendChild(box);
+        }
+
+        function showTab(tab) {
+            document.querySelectorAll('.main-content > div').forEach(d => d.classList.add('hidden'));
+            document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.remove('hidden');
+            renderUI();
+        }
+    </script>
+</body>
+</html>
